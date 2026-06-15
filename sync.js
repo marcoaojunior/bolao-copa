@@ -26,7 +26,8 @@ const WC2026_ID = 2000;
 
 const TEAM_MAP = {
   "Mexico":"México","South Africa":"África do Sul","Korea Republic":"Coreia do Sul",
-  "Rep. of Korea":"Coreia do Sul","Czech Republic":"República Tcheca","Czechia":"República Tcheca",
+  "Rep. of Korea":"Coreia do Sul","South Korea":"Coreia do Sul","Korea":"Coreia do Sul",
+  "Czech Republic":"República Tcheca","Czechia":"República Tcheca","Czech Rep.":"República Tcheca",
   "Canada":"Canadá","Bosnia and Herzegovina":"Bósnia e Herzegovina","Bosnia-Herzegovina":"Bósnia e Herzegovina",
   "Qatar":"Catar","Switzerland":"Suíça","Brazil":"Brasil","Morocco":"Marrocos",
   "Haiti":"Haiti","Scotland":"Escócia","United States":"Estados Unidos","USA":"Estados Unidos",
