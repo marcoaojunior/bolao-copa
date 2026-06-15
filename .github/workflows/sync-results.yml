@@ -14,16 +14,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install firebase-admin node-fetch@2
 
-      - name: Write service account file
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/serviceaccount.json
-
       - name: Run sync script
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/serviceaccount.json
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
         run: node sync.js
+
