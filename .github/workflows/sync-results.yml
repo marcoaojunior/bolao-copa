@@ -17,11 +17,10 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install firebase-admin node-fetch@2
+        run: npm install firebase-admin@13 node-fetch@2
 
       - name: Run sync script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
         run: node sync.js
-
