@@ -35,7 +35,7 @@ const TEAM_MAP = {
   "Germany":"Alemanha","Curaçao":"Curaçao","Ivory Coast":"Costa do Marfim","Côte d'Ivoire":"Costa do Marfim",
   "Ecuador":"Equador","Netherlands":"Holanda","Japan":"Japão","Sweden":"Suécia",
   "Tunisia":"Tunísia","Belgium":"Bélgica","Egypt":"Egito","Iran":"Irã","IR Iran":"Irã",
-  "New Zealand":"Nova Zelândia","Spain":"Espanha","Cape Verde":"Cabo Verde",
+  "New Zealand":"Nova Zelândia","Spain":"Espanha","Cape Verde":"Cabo Verde","Cape Verde Islands":"Cabo Verde",
   "Saudi Arabia":"Arábia Saudita","Uruguay":"Uruguai","France":"França","Senegal":"Senegal",
   "Iraq":"Iraque","Norway":"Noruega","Argentina":"Argentina","Algeria":"Argélia",
   "Austria":"Áustria","Jordan":"Jordânia","Ghana":"Gana","Panama":"Panamá",
