@@ -1,10 +1,23 @@
 const admin = require('firebase-admin');
 const fetch = require('node-fetch');
 
+// Lê a credencial direto do segredo do GitHub (sem criar arquivo) e
+// descobre a URL do banco automaticamente a partir do projeto.
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} catch (e) {
+  console.error('❌ Não consegui ler o segredo FIREBASE_SERVICE_ACCOUNT.');
+  console.error('   Verifique se você colou o conteúdo INTEIRO do arquivo .json no segredo do GitHub.');
+  console.error('   Detalhe técnico:', e.message);
+  process.exit(1);
+}
+
 admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
-  databaseURL: 'https://bolao-copa-e19d4-default-rtdb.firebaseio.com' // ← altere para sua URL
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: `https://${serviceAccount.project_id}-default-rtdb.firebaseio.com`
 });
+console.log(`🔥 Conectado ao projeto: ${serviceAccount.project_id}`);
 const db = admin.database();
 
 const API_KEY = process.env.FOOTBALL_DATA_API_KEY;
@@ -164,3 +177,4 @@ async function main() {
   process.exit(0);
 }
 main();
+
