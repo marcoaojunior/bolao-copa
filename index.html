@@ -171,6 +171,11 @@ function matchTime(date,time){
   return new Date(Date.UTC(2026,m-1,d,parseInt(hStr)+3,parseInt(minStr||"0"),0));
 }
 function lockTime(dt){return new Date(dt.getTime()-60*60*1000)}
+// ─── INÍCIO DO BOLÃO ───
+// O bolão começa a valer na 2ª rodada de grupos. Todos os jogos ANTES desta data
+// (1ª rodada, 11–17/06) ficam bloqueados para palpite e não contam pontos.
+// 18/06/2026 às 00h BRT (= 03h UTC). Para mudar: ajuste os números (ano, mês-1, dia, hora-UTC, min, 0).
+const BOLAO_START=Date.UTC(2026,5,18,3,0,0);
 function matchState(mt,hasResult){
   if(hasResult)return"played";
   const now=Date.now(),lt=lockTime(mt).getTime();
@@ -431,10 +436,12 @@ function countPalpites(name){
 function isLocked(mt,hasResult){
   if(hasResult)return true;
   if(isAdmin)return false;
+  if(mt.getTime()<BOLAO_START)return true; // 1ª rodada — bolão começa na 2ª
   return Date.now()>=lockTime(mt).getTime();
 }
 function lockBadge(mt,hasResult){
   if(hasResult)return`<span class="lock-badge lock-played">✅ Encerrado</span>`;
+  if(mt.getTime()<BOLAO_START)return`<span class="lock-badge lock-closed">🔒 1ª rodada — não vale</span>`;
   const now=Date.now(),lt=lockTime(mt).getTime(),msLeft=lt-now;
   if(msLeft<=0)return`<span class="lock-badge lock-closed">🔒 Palpite encerrado</span>`;
   if(msLeft<2*3600000)return`<span class="lock-badge lock-soon" data-countdown="${lt}">⚠️ Fecha em ${fmtCountdown(msLeft)}</span>`;
@@ -661,7 +668,7 @@ function renderPalpites(){
 
   const upcoming=GROUP_MATCHES.filter(m=>{
     const mt=matchTime(m.date,m.time),ms=lockTime(mt).getTime()-Date.now();
-    return ms>0&&ms<3600000&&!fbState.results[m.id];
+    return ms>0&&ms<3600000&&!fbState.results[m.id]&&mt.getTime()>=BOLAO_START;
   });
   const warnBanner=upcoming.length&&!isAdmin?`<div class="alert warn">⚠️ ${upcoming.length} jogo(s) fechando em menos de 1h: ${upcoming.map(m=>`${flag(m.home)}${m.home}×${flag(m.away)}${m.away}`).join(", ")}</div>`:"";
   const autoSaveInfo=!isAdmin?`<div class="alert info" style="margin-bottom:12px">💡 Seus palpites são salvos automaticamente assim que você preencher os dois campos de cada jogo.</div>`:"";
@@ -1388,3 +1395,4 @@ function showAlert(id,type,msg){
 </script>
 </body>
 </html>
+
