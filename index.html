@@ -14,7 +14,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .header::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#009c3b 33%,#ffdf00 33%,#ffdf00 66%,#009c3b 66%)}
 .header h1{font-family:'Bebas Neue',sans-serif;font-size:38px;color:#ffdf00;line-height:1;letter-spacing:2px}
 .header p{color:rgba(255,255,255,.6);font-size:12px;margin-top:2px}
-.tabs{display:flex;gap:3px;background:var(--blue);border-radius:12px;padding:4px;margin-bottom:16px;flex-wrap:wrap}
+.tabs-wrap{background:var(--blue);border-radius:12px;padding:4px;margin-bottom:16px}
+.tabs{display:flex;gap:3px;flex-wrap:wrap}
 .tab{flex:1;padding:9px 4px;border:none;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;transition:.15s;white-space:nowrap;min-width:60px}
 .tab.active{background:var(--gold);color:var(--blue)}
 .tab:hover:not(.active){background:rgba(255,255,255,.1);color:#fff}
@@ -100,8 +101,10 @@ input:focus,select:focus{border-color:var(--blue)}
 .api-status-bar{background:var(--blue);color:rgba(255,255,255,.8);font-size:11px;padding:4px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:6px}
 .api-card{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:10px}
 .api-card h4{color:var(--blue);font-size:14px;font-weight:600;margin-bottom:6px}
+.evo-result-item:hover{background:var(--surface2)}
 @keyframes spin{to{transform:rotate(360deg)}}
-.view-toggle{display:flex;gap:4px;margin-bottom:14px}
+.view-toggle{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-sep{width:1px;background:var(--border);margin:0 6px;height:24px;display:inline-block}
 .view-btn{padding:6px 16px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:600;transition:.15s}
 .view-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
 .view-btn:hover:not(.active){border-color:var(--blue);color:var(--blue)}
@@ -125,21 +128,13 @@ input:focus,select:focus{border-color:var(--blue)}
   <div id="root"><div style="text-align:center;padding:60px;color:var(--muted)"><div style="font-size:32px;animation:spin 1s linear infinite;display:inline-block">⚽</div><p style="margin-top:12px">Conectando...</p></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-database.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDdEu6JaTCHUll75RuNGgyKC7sRB64N_b4",
-  authDomain: "bolao-copa-e19d4.firebaseapp.com",
-  databaseURL: "https://bolao-copa-e19d4-default-rtdb.firebaseio.com",
-  projectId: "bolao-copa-e19d4",
-  storageBucket: "bolao-copa-e19d4.firebasestorage.app",
-  messagingSenderId: "460749450789",
-  appId: "1:460749450789:web:b8dc980142c8ddfcd5d9cc"
-};
-
+const firebaseConfig={apiKey:"AIzaSyDdEu6JaTCHUll75RuNGgyKC7sRB64N_b4",authDomain:"bolao-copa-e19d4.firebaseapp.com",databaseURL:"https://bolao-copa-e19d4-default-rtdb.firebaseio.com",projectId:"bolao-copa-e19d4",storageBucket:"bolao-copa-e19d4.firebasestorage.app",messagingSenderId:"460749450789",appId:"1:460749450789:web:b8dc980142c8ddfcd5d9cc"};
 const fbApp=initializeApp(firebaseConfig);
 const db=getDatabase(fbApp);
 const auth=getAuth(fbApp);
@@ -157,7 +152,7 @@ async function hashPassword(password){
 }
 
 // ─── API ───
-const API_KEY="COLE_SUA_CHAVE_FOOTBALL_DATA_ORG_AQUI";
+const API_KEY="";
 const FD_BASE="https://api.football-data.org/v4";
 const WC2026_ID=2000;
 let apiSyncInterval=null;
@@ -306,6 +301,7 @@ let currentUser=_sess.currentUser||null;
 let isAdmin=_sess.isAdmin||false;
 let currentTab="ranking",currentPhase="Grupos",detailPlayer=null;
 let palpiteView=localStorage.getItem("bolao26_view")||"grupo";
+let matchFilter=localStorage.getItem("bolao26_filter")||"todos"; // "todos" | "abertos" | "encerrados"
 let localResults={};
 let inputBuffer={};
 let autoSaveTimers={};
@@ -358,6 +354,7 @@ function startClock(){
 
 // ─── AUTO-SYNC API a cada 5 minutos ───
 function startApiSync(){
+  if(!API_KEY)return; // sincronização interna desativada — resultados vêm pelo GitHub Actions
   if(apiSyncInterval)clearInterval(apiSyncInterval);
   // roda imediatamente ao logar, depois a cada 5min
   runApiSync();
@@ -433,6 +430,84 @@ function countPalpites(name){
   const p=fbState.players[name];if(!p)return 0;
   return Object.keys(p.palpites||{}).length+Object.keys(p.elimPalpites||{}).length;
 }
+
+// ─── HISTÓRICO DE EVOLUÇÃO E FORMA RECENTE ───
+// Retorna lista de todos os jogos com resultado, ordenados cronologicamente
+function getOrderedPlayedMatches(){
+  const all=[];
+  GROUP_MATCHES.forEach(m=>{
+    const res=fbState.results[m.id];
+    if(res?.h!==undefined){
+      all.push({id:m.id,isElim:false,mt:matchTime(m.date,m.time),mult:1,res});
+    }
+  });
+  fbState.elimMatches.forEach(m=>{
+    const eid='e_'+m.id;
+    const res=fbState.results[eid];
+    if(res?.h!==undefined&&m.date&&m.time){
+      all.push({id:eid,isElim:true,mt:matchTime(m.date,m.time),mult:2,res});
+    }
+  });
+  all.sort((a,b)=>a.mt-b.mt);
+  return all;
+}
+
+// Calcula pontos acumulados de cada jogador a cada jogo (para o gráfico de evolução)
+function computeEvolutionData(){
+  const playedMatches=getOrderedPlayedMatches();
+  const players=Object.keys(fbState.players);
+  const cumPts={};
+  players.forEach(n=>cumPts[n]=0);
+  const series={};
+  players.forEach(n=>series[n]=[]);
+
+  playedMatches.forEach(match=>{
+    players.forEach(n=>{
+      const p=fbState.players[n];
+      const pal=match.isElim?p.elimPalpites?.[match.id]:p.palpites?.[match.id];
+      const pts=calcPts(pal,match.res,match.mult);
+      cumPts[n]+=(pts||0);
+    });
+    // calcula ranking (posição) deste momento
+    const ranked=players.map(n=>({n,pts:cumPts[n]})).sort((a,b)=>b.pts-a.pts);
+    const posMap={};
+    ranked.forEach((r,i)=>posMap[r.n]=i+1);
+    players.forEach(n=>series[n].push({pos:posMap[n],pts:cumPts[n]}));
+  });
+
+  return {labels:playedMatches.map((_,i)=>`J${i+1}`),series,totalGames:playedMatches.length};
+}
+
+// Forma recente: últimos 5 jogos com resultado, na ordem cronológica
+// Retorna array de {color} onde color = green|yellow|gray|red
+function getRecentForm(name,limit=5){
+  const p=fbState.players[name];if(!p)return[];
+  const playedMatches=getOrderedPlayedMatches();
+  const form=[];
+  playedMatches.forEach(match=>{
+    const pal=match.isElim?p.elimPalpites?.[match.id]:p.palpites?.[match.id];
+    const res=match.res;
+    if(!pal||pal.h===undefined||pal.h===""){
+      form.push("none"); // não palpitou
+      return;
+    }
+    const ph=parseInt(pal.h),pa=parseInt(pal.a),rh=parseInt(res.h),ra=parseInt(res.a);
+    const exact=ph===rh&&pa===ra;
+    const winnerOk=(ph>pa?1:ph<pa?-1:0)===(rh>ra?1:rh<ra?-1:0);
+    const saldoOk=(ph-pa)===(rh-ra);
+    if(exact)form.push("green");
+    else if(winnerOk&&saldoOk)form.push("yellow");
+    else if(winnerOk)form.push("gray");
+    else form.push("red");
+  });
+  return form.slice(-limit);
+}
+
+function formDot(color){
+  const colors={green:"#22c55e",yellow:"#eab308",gray:"#9ca3af",red:"#ef4444",none:"#e5e7eb"};
+  const titles={green:"Placar exato",yellow:"Vencedor + saldo",gray:"Só vencedor",red:"Errou",none:"Sem palpite"};
+  return`<span title="${titles[color]}" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${colors[color]};margin-right:2px"></span>`;
+}
 function isLocked(mt,hasResult){
   if(hasResult)return true;
   if(isAdmin)return false;
@@ -453,16 +528,19 @@ function lockBadge(mt,hasResult){
 async function autoSavePalpite(key,isElim){
   const buf=inputBuffer[key];
   if(!buf||buf.h===undefined||buf.h===""||buf.a===undefined||buf.a==="")return;
+  // Admin salva para o jogador selecionado; jogador salva para si mesmo
+  const targetPlayer=isAdmin?detailPlayer:currentUser;
+  if(!targetPlayer){console.warn("Nenhum jogador selecionado para salvar");return;}
   const statusEl=document.getElementById(`status_${key}`);
   if(statusEl){statusEl.textContent="💾 Salvando...";statusEl.className="save-status saving";}
   try{
     const updates={};
     if(isElim){
-      updates[`bolao/players/${currentUser}/elimPalpites/${key}/h`]=buf.h;
-      updates[`bolao/players/${currentUser}/elimPalpites/${key}/a`]=buf.a;
+      updates[`bolao/players/${targetPlayer}/elimPalpites/${key}/h`]=buf.h;
+      updates[`bolao/players/${targetPlayer}/elimPalpites/${key}/a`]=buf.a;
     } else {
-      updates[`bolao/players/${currentUser}/palpites/${key}/h`]=buf.h;
-      updates[`bolao/players/${currentUser}/palpites/${key}/a`]=buf.a;
+      updates[`bolao/players/${targetPlayer}/palpites/${key}/h`]=buf.h;
+      updates[`bolao/players/${targetPlayer}/palpites/${key}/a`]=buf.a;
     }
     await update(ref(db),updates);
     delete inputBuffer[key];
@@ -482,7 +560,9 @@ function render(){
   root.innerHTML=`
     ${renderTopBar()}${renderTabs()}
     <div class="section ${currentTab==="ranking"?"active":""}">${renderRanking()}</div>
+    <div class="section ${currentTab==="evolucao"?"active":""}">${renderEvolucao()}</div>
     <div class="section ${currentTab==="palpites"?"active":""}">${renderPalpites()}</div>
+    <div class="section ${currentTab==="palpitesencerrados"?"active":""}">${renderPalpitesEncerrados()}</div>
     <div class="section ${currentTab==="especiais"?"active":""}">${renderEspeciais()}</div>
     <div class="section ${currentTab==="resultados"?"active":""}">${renderResultados()}</div>
     <div class="section ${currentTab==="regras"?"active":""}">${renderRegras()}</div>
@@ -620,8 +700,13 @@ function renderTopBar(){
   </div>`;
 }
 function renderTabs(){
-  const tabs=[{k:"ranking",label:"🏆 Ranking"},{k:"palpites",label:"✏️ Palpites"},{k:"especiais",label:"⭐ Especiais"},{k:"resultados",label:"📊 Resultados"},{k:"regras",label:"📋 Regras"},...(isAdmin?[{k:"admin",label:"⚙️ Admin"}]:[])];
-  return`<div class="tabs">${tabs.map(t=>`<button class="tab ${currentTab===t.k?"active":""}" data-tab="${t.k}">${t.label}</button>`).join("")}</div>`;
+  const row1=[{k:"ranking",label:"🏆 Ranking"},{k:"evolucao",label:"📈 Evolução"},{k:"palpites",label:"✏️ Palpites"},{k:"palpitesencerrados",label:"🔓 Encerrados"}];
+  const row2=[{k:"especiais",label:"⭐ Especiais"},{k:"resultados",label:"📊 Resultados"},{k:"regras",label:"📋 Regras"},...(isAdmin?[{k:"admin",label:"⚙️ Admin"}]:[])];
+  const renderRow=(tabs)=>tabs.map(t=>`<button class="tab ${currentTab===t.k?"active":""}" data-tab="${t.k}">${t.label}</button>`).join("");
+  return`<div class="tabs-wrap">
+    <div class="tabs">${renderRow(row1)}</div>
+    <div class="tabs" style="margin-top:4px">${renderRow(row2)}</div>
+  </div>`;
 }
 
 function renderRanking(){
@@ -644,15 +729,304 @@ function renderRanking(){
     </div>
     ${sorted.map((p,i)=>{
       const isMe=p.n===currentUser;
+      const form=getRecentForm(p.n,5);
+      const formHtml=form.length?`<span style="margin-left:6px">${form.map(formDot).join("")}</span>`:"";
       return`<div class="rank-row ${isMe?"me":""}">
         <div class="rank-pos ${posClass(i)}">${i<3?medals[i]:i+1}</div>
         <div style="flex:1">
-          <div class="rank-name">${p.n}${isMe?' <span style="font-size:11px;color:var(--green)">(você)</span>':""}</div>
+          <div class="rank-name">${p.n}${isMe?' <span style="font-size:11px;color:var(--green)">(você)</span>':""}${formHtml}</div>
           <div class="rank-sub">${p.st.acertos} acertos · ${p.st.exatos} exatos · ${countPalpites(p.n)} palpites</div>
         </div>
         <div class="rank-pts">${p.pts}<span style="font-size:12px;color:var(--muted);font-family:'DM Sans'"> pts</span></div>
       </div>`;
     }).join("")}`;
+}
+
+let evoChartInstance=null;
+let evoHighlighted=new Set(); // múltiplos participantes destacados
+let evoAllHighlighted=false;
+
+const EVO_PALETTE=["#a78bfa","#fb923c","#34d399","#f472b6","#60a5fa","#fbbf24","#a3e635","#f87171","#22d3ee","#c084fc","#fb7185","#4ade80"];
+
+function setupEvolutionChart(){
+  const canvas=document.getElementById("evoChart");
+  if(!canvas||typeof Chart==="undefined")return;
+  const evo=computeEvolutionData();
+  if(evo.totalGames===0)return;
+
+  const players=Object.keys(fbState.players);
+
+  // jogador logado sempre conta como destacado implicitamente, mas não trava o toggle
+  const isActiveHighlight=(n)=>evoAllHighlighted||evoHighlighted.has(n)||n===currentUser;
+
+  const datasets=players.map((n,i)=>{
+    const active=isActiveHighlight(n);
+    const isMe=n===currentUser;
+    const baseColor=isMe?"#009c3b":EVO_PALETTE[i%EVO_PALETTE.length];
+    return{
+      label:n,
+      data:evo.series[n].map(s=>s.pos),
+      borderColor:active?baseColor:"rgba(150,150,150,0.2)",
+      backgroundColor:"transparent",
+      borderWidth:active?3:1,
+      pointRadius:active?3:0,
+      pointHoverRadius:5,
+      tension:0.2,
+      order:active?0:1,
+      _playerName:n
+    };
+  });
+
+  if(evoChartInstance)evoChartInstance.destroy();
+  evoChartInstance=new Chart(canvas,{
+    type:"line",
+    data:{labels:evo.labels,datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      scales:{
+        y:{reverse:true,min:1,max:players.length,ticks:{stepSize:1,font:{size:11}},title:{display:true,text:"Posição no ranking"}},
+        x:{ticks:{font:{size:10},maxRotation:0,autoSkip:true}}
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            title:(items)=>items[0]?.label||"",
+            label:(item)=>`${item.dataset.label}: ${item.parsed.y}º lugar`
+          }
+        }
+      },
+      interaction:{mode:"nearest",intersect:false},
+      onClick:(evt,elements,chart)=>{
+        // Clique numa linha alterna o destaque daquele participante
+        const points=chart.getElementsAtEventForMode(evt,"nearest",{intersect:false},true);
+        if(points.length){
+          const idx=points[0].datasetIndex;
+          const name=chart.data.datasets[idx]._playerName;
+          toggleEvoHighlight(name);
+        }
+      }
+    }
+  });
+
+  renderEvoBadges();
+
+  // Busca por nome
+  const searchInput=document.getElementById("evo-search");
+  const resultsDiv=document.getElementById("evo-search-results");
+
+  if(searchInput){
+    searchInput.oninput=()=>{
+      const q=searchInput.value.trim().toLowerCase();
+      if(!q){resultsDiv.style.display="none";return;}
+      const matches=players.filter(n=>n.toLowerCase().includes(q)).slice(0,8);
+      if(!matches.length){resultsDiv.style.display="none";return;}
+      resultsDiv.style.display="block";
+      resultsDiv.innerHTML=matches.map(n=>{
+        const checked=evoHighlighted.has(n)?"✓ ":"";
+        return`<div class="evo-result-item" data-name="${n}" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">${checked}${n}</div>`;
+      }).join("");
+      resultsDiv.querySelectorAll(".evo-result-item").forEach(el=>{
+        el.onclick=()=>{
+          toggleEvoHighlight(el.dataset.name);
+          searchInput.value="";
+          resultsDiv.style.display="none";
+        };
+      });
+    };
+  }
+
+  const btnAll=document.getElementById("evo-toggle-all");
+  if(btnAll)btnAll.onclick=()=>{
+    evoAllHighlighted=!evoAllHighlighted;
+    if(evoAllHighlighted)evoHighlighted.clear();
+    setupEvolutionChart();
+  };
+  const btnClear=document.getElementById("evo-clear-all");
+  if(btnClear)btnClear.onclick=()=>{
+    evoHighlighted.clear();
+    evoAllHighlighted=false;
+    setupEvolutionChart();
+  };
+}
+
+function toggleEvoHighlight(name){
+  if(name===currentUser)return; // jogador logado já está sempre destacado
+  evoAllHighlighted=false;
+  if(evoHighlighted.has(name))evoHighlighted.delete(name);
+  else evoHighlighted.add(name);
+  setupEvolutionChart();
+}
+
+function renderEvoBadges(){
+  const badgeDiv=document.getElementById("evo-highlight-badge");
+  if(!badgeDiv)return;
+  const names=Array.from(evoHighlighted);
+  if(evoAllHighlighted){
+    badgeDiv.style.display="block";
+    badgeDiv.innerHTML=`<span class="alert info" style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px">📍 Destacando todos os participantes</span>`;
+    return;
+  }
+  if(!names.length){
+    badgeDiv.style.display="none";
+    return;
+  }
+  badgeDiv.style.display="block";
+  badgeDiv.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:6px">`+
+    names.map(n=>`<span class="alert info" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;margin:0">${n} <button data-remove-evo="${n}" style="border:none;background:transparent;cursor:pointer;color:var(--blue);font-weight:600;padding:0">✕</button></span>`).join("")+
+    `</div>`;
+  badgeDiv.querySelectorAll("[data-remove-evo]").forEach(btn=>{
+    btn.onclick=()=>{toggleEvoHighlight(btn.dataset.removeEvo);};
+  });
+}
+
+// ─── PALPITES ENCERRADOS ───
+let peSelectedId=null; // id do jogo atualmente exibido (string, prefixado com 'e_' se elim)
+let peFilterGroup="todos";
+let peFilterDate="todos";
+let peSearchTeam="";
+
+function getClosedMatchesList(){
+  const now=Date.now();
+  const closedGroup=GROUP_MATCHES.filter(m=>now>=lockTime(matchTime(m.date,m.time)).getTime())
+    .map(m=>({...m,isElim:false,rid:String(m.id),mt:matchTime(m.date,m.time)}));
+  const closedElim=fbState.elimMatches.filter(m=>{
+    if(!m.date||!m.time)return false;
+    return now>=lockTime(matchTime(m.date,m.time)).getTime();
+  }).map(m=>({...m,isElim:true,rid:'e_'+m.id,mt:matchTime(m.date,m.time)}));
+  return [...closedGroup,...closedElim].sort((a,b)=>b.mt-a.mt); // mais recente primeiro
+}
+
+function renderPalpitesEncerrados(){
+  const players=Object.keys(fbState.players);
+  if(!players.length)return`<div class="empty"><div class="icon">👥</div><p>Nenhum jogador ainda</p></div>`;
+
+  const allClosed=getClosedMatchesList();
+  if(!allClosed.length){
+    return`<div class="empty"><div class="icon">🔒</div><p>Nenhum jogo com prazo de palpite encerrado ainda. Os palpites de cada jogo aparecem aqui automaticamente 1h antes do início — mantendo a surpresa até lá.</p></div>`;
+  }
+
+  // Aplica filtros para a LISTA de seleção (não afeta o jogo já exibido)
+  let filtered=allClosed;
+  if(peFilterGroup!=="todos")filtered=filtered.filter(m=>!m.isElim&&m.group===peFilterGroup||m.isElim&&m.phase===peFilterGroup);
+  if(peFilterDate!=="todos")filtered=filtered.filter(m=>m.date===peFilterDate);
+  if(peSearchTeam.trim()){
+    const q=peSearchTeam.trim().toLowerCase();
+    filtered=filtered.filter(m=>m.home.toLowerCase().includes(q)||m.away.toLowerCase().includes(q));
+  }
+
+  // Se nenhum jogo selecionado ainda, usa o mais recente da lista completa (não filtrada)
+  if(!peSelectedId||!allClosed.find(m=>m.rid===peSelectedId)){
+    peSelectedId=allClosed[0].rid;
+  }
+  const current=allClosed.find(m=>m.rid===peSelectedId)||allClosed[0];
+
+  // Opções de filtro disponíveis
+  const groupOptions=Array.from(new Set(allClosed.filter(m=>!m.isElim).map(m=>m.group))).sort();
+  const phaseOptions=Array.from(new Set(allClosed.filter(m=>m.isElim).map(m=>m.phase)));
+  const dateOptions=Array.from(new Set(allClosed.map(m=>m.date))).sort((a,b)=>{
+    const[da,ma]=a.split("/").map(Number),[db,mb]=b.split("/").map(Number);
+    return ma-mb||da-db;
+  });
+
+  // Navegação anterior/próximo dentro da lista completa ordenada
+  const idxInAll=allClosed.findIndex(m=>m.rid===current.rid);
+  const prevMatch=allClosed[idxInAll+1]; // mais antigo
+  const nextMatch=allClosed[idxInAll-1]; // mais recente
+
+  const res=fbState.results[current.rid];
+  const mult=current.isElim?2:1;
+  const rows=players.map(n=>{
+    const p=fbState.players[n];
+    const realPal=current.isElim?p.elimPalpites?.[current.rid]:p.palpites?.[current.id];
+    const palStr=realPal?.h!==undefined?`${realPal.h} × ${realPal.a}`:"—";
+    const pts=res?.h!==undefined?calcPts(realPal,res,mult):null;
+    return{n,palStr,pts};
+  }).sort((a,b)=>a.n.localeCompare(b.n));
+
+  return`
+    <div class="alert info">🔓 Jogos aqui têm o prazo de palpite encerrado (1h antes do início). Por padrão mostra o mais recente — use os filtros para consultar outros.</div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <select id="pe-filter-group" style="margin:0;flex:1;min-width:120px">
+          <option value="todos">Todos os grupos/fases</option>
+          ${groupOptions.map(g=>`<option value="${g}" ${peFilterGroup===g?"selected":""}>Grupo ${g}</option>`).join("")}
+          ${phaseOptions.map(p=>`<option value="${p}" ${peFilterGroup===p?"selected":""}>${p}</option>`).join("")}
+        </select>
+        <select id="pe-filter-date" style="margin:0;flex:1;min-width:110px">
+          <option value="todos">Todas as datas</option>
+          ${dateOptions.map(d=>`<option value="${d}" ${peFilterDate===d?"selected":""}>${d}</option>`).join("")}
+        </select>
+      </div>
+      <input id="pe-search-team" placeholder="Buscar por seleção..." value="${peSearchTeam}" style="margin-bottom:8px">
+      <div id="pe-match-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+        ${filtered.length?filtered.map(m=>{
+          const isActive=m.rid===current.rid;
+          return`<div class="pe-list-item" data-rid="${m.rid}" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);${isActive?'background:var(--surface2);font-weight:600':''}">
+            ${flag(m.home)} ${m.home} × ${m.away} ${flag(m.away)} <span style="color:var(--muted);font-size:11px">· ${m.date} · ${m.isElim?m.phase:'Grupo '+m.group}</span>
+          </div>`;
+        }).join(""):'<div style="padding:12px;color:var(--muted);font-size:13px">Nenhum jogo encontrado com esse filtro</div>'}
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <button class="btn btn-sm btn-outline" id="pe-prev" ${!prevMatch?"disabled style='opacity:.4'":""}>← Anterior</button>
+        <span style="font-size:11px;color:var(--muted)">${idxInAll+1} de ${allClosed.length}</span>
+        <button class="btn btn-sm btn-outline" id="pe-next" ${!nextMatch?"disabled style='opacity:.4'":""}>Próximo →</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+        <div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--blue)">${flag(current.home)} ${current.home} × ${current.away} ${flag(current.away)}</div>
+          <div style="font-size:11px;color:var(--muted)">${current.isElim?current.phase:'Grupo '+current.group} · ${current.time||"?"} BRT · ${current.date}${current.isElim?' · ×'+mult+' pts':''}</div>
+        </div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${res?.h!==undefined?"var(--green)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}`:"Aguardando resultado"}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--gold)">
+            <th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600">Participante</th>
+            <th style="text-align:center;padding:6px 8px;color:var(--muted);font-weight:600">Palpite</th>
+            <th style="text-align:right;padding:6px 8px;color:var(--muted);font-weight:600">Pontos</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)${r.n===currentUser?';background:#f0fff4':''}">
+            <td style="padding:6px 8px">${r.n}${r.n===currentUser?' <span style="font-size:11px;color:var(--green)">(você)</span>':''}</td>
+            <td style="text-align:center;padding:6px 8px;font-weight:600">${r.palStr}</td>
+            <td style="text-align:right;padding:6px 8px;color:${r.pts===null?'var(--muted)':r.pts===0?'var(--red)':'var(--green)'};font-weight:600">${r.pts===null?'—':r.pts}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderEvolucao(){
+  const players=Object.keys(fbState.players);
+  if(!players.length)return`<div class="empty"><div class="icon">👥</div><p>Nenhum jogador ainda</p></div>`;
+  const evo=computeEvolutionData();
+  if(evo.totalGames===0){
+    return`<div class="empty"><div class="icon">📈</div><p>O gráfico de evolução aparece aqui assim que o primeiro jogo for apurado.</p></div>`;
+  }
+  return`
+    <div class="card" style="margin-bottom:10px">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Posição de cada participante ao longo dos jogos apurados. Clique numa linha, busque um nome, ou destaque todos.</p>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="evo-search" placeholder="Buscar participante pelo nome..." style="margin-bottom:0;flex:1">
+        <button class="btn btn-sm btn-outline" id="evo-toggle-all" style="white-space:nowrap">${evoAllHighlighted?"Ver normal":"🎨 Destacar todos"}</button>
+        <button class="btn btn-sm btn-outline" id="evo-clear-all" style="white-space:nowrap">Limpar</button>
+      </div>
+      <div id="evo-search-results" style="display:none;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:8px"></div>
+      <div id="evo-highlight-badge" style="display:none;margin-bottom:8px"></div>
+    </div>
+    <div class="card">
+      <div style="position:relative;height:420px">
+        <canvas id="evoChart" role="img" aria-label="Gráfico de evolução da posição de cada participante no ranking ao longo dos jogos apurados"></canvas>
+      </div>
+    </div>
+  `;
 }
 
 function renderPalpites(){
@@ -678,6 +1052,10 @@ function renderPalpites(){
     const viewToggle=`<div class="view-toggle">
       <button class="view-btn ${palpiteView==="grupo"?"active":""}" data-view="grupo">📋 Por Grupo</button>
       <button class="view-btn ${palpiteView==="data"?"active":""}" data-view="data">📅 Por Data</button>
+      <span class="filter-sep"></span>
+      <button class="view-btn ${matchFilter==="todos"?"active":""}" data-filter="todos">Todos</button>
+      <button class="view-btn ${matchFilter==="abertos"?"active":""}" data-filter="abertos">🟢 A jogar</button>
+      <button class="view-btn ${matchFilter==="encerrados"?"active":""}" data-filter="encerrados">✅ Encerrados</button>
     </div>`;
 
     // Função auxiliar para renderizar uma linha de jogo
@@ -717,8 +1095,16 @@ function renderPalpites(){
     let html="";
     if(palpiteView==="grupo"){
       Object.keys(GROUPS).forEach(g=>{
+        const filteredM=GROUPS[g].matches.filter(m=>{
+          const hasResult=fbState.results[m.id]?.h!==undefined;
+          const locked=isLocked(matchTime(m.date,m.time),hasResult);
+          if(matchFilter==="abertos")return!locked&&!hasResult;
+          if(matchFilter==="encerrados")return hasResult||(locked&&!hasResult);
+          return true;
+        });
+        if(!filteredM.length)return;
         html+=`<div class="match-group"><div class="group-label">Grupo ${g} <span style="font-size:13px;font-family:'DM Sans';font-weight:400;color:var(--muted)">${GROUPS[g].teams.map(t=>flag(t)).join(" ")}</span></div>`;
-        GROUPS[g].matches.forEach(m=>{ html+=mkRow({...m,group:g},viewPlayer); });
+        filteredM.forEach(m=>{ html+=mkRow({...m,group:g},viewPlayer); });
         html+="</div>";
       });
     } else {
@@ -730,12 +1116,21 @@ function renderPalpites(){
       Object.entries(byDate).forEach(([date,matches])=>{
         const brt=new Date(matchTime(date,"12h").getTime()-3*3600000);
         const wd=weekdays[brt.getUTCDay()];
+        const filteredDate=matches.filter(m=>{
+          const hasResult=fbState.results[m.id]?.h!==undefined;
+          const locked=isLocked(matchTime(m.date,m.time),hasResult);
+          if(matchFilter==="abertos")return!locked&&!hasResult;
+          if(matchFilter==="encerrados")return hasResult||(locked&&!hasResult);
+          return true;
+        });
+        if(!filteredDate.length)return;
         html+=`<div class="date-group"><div class="date-label">📅 ${date} <span style="font-size:14px;font-family:'DM Sans';font-weight:400;color:var(--muted)">${wd}</span></div>`;
-        matches.forEach(m=>{ html+=mkRow(m,viewPlayer); });
+        filteredDate.forEach(m=>{ html+=mkRow(m,viewPlayer); });
         html+="</div>";
       });
     }
-    return phTabs+viewToggle+warnBanner+autoSaveInfo+playerSel+html;
+    const adminSaveBtn=isAdmin&&detailPlayer?`<div class="flex-end" style="margin-top:12px"><button class="btn btn-sm btn-green" id="btn-admin-save-palpites">💾 Salvar palpites de ${detailPlayer}</button></div>`:"";
+    return phTabs+viewToggle+warnBanner+autoSaveInfo+playerSel+html+adminSaveBtn;
   } else {
     const elimMs=fbState.elimMatches.filter(m=>m.phase===currentPhase);
     if(!elimMs.length)return phTabs+playerSel+`<div class="empty"><div class="icon">⏳</div><p>Confrontos desta fase ainda não definidos. Serão importados automaticamente da API assim que a FIFA anunciar os jogos.</p></div>`;
@@ -770,7 +1165,8 @@ function renderPalpites(){
         <div class="match-team right">${m.away} ${flag(m.away)}</div>
       </div>`;
     });
-    return phTabs+autoSaveInfo+playerSel+html;
+    const adminSaveBtnElim=isAdmin&&detailPlayer?`<div class="flex-end" style="margin-top:12px"><button class="btn btn-sm btn-green" id="btn-admin-save-palpites">💾 Salvar palpites de ${detailPlayer}</button></div>`:"";
+    return phTabs+autoSaveInfo+playerSel+html+adminSaveBtnElim;
   }
 }
 
@@ -779,9 +1175,9 @@ function renderEspeciais(){
   const esp=fbState.especiais||{};
   const artOk=esp.artilheiro&&pEsp.artilheiro&&esp.artilheiro.toLowerCase()===pEsp.artilheiro.toLowerCase();
   const camOk=esp.campeao&&pEsp.campeao&&esp.campeao.toLowerCase()===pEsp.campeao.toLowerCase();
+  // Prazo: 1h antes do 1o jogo — México × África do Sul, 11/06 18h BRT = 21h UTC
   // Prazo dos palpites especiais — REABERTO para a família (bolão começou no meio da Copa)
   // 18/06/2026 às 12h BRT (= 15h UTC), antes do início da 2ª rodada de grupos.
-  // Para mudar a data: ajuste os números abaixo (ano, mês-1, dia, hora-UTC, minuto, 0).
   const ESPECIAIS_DEADLINE=new Date(Date.UTC(2026,5,18,15,0,0));
   const espDeadlinePassed=!isAdmin&&Date.now()>=ESPECIAIS_DEADLINE.getTime();
   const viewPlayer=isAdmin?detailPlayer:currentUser;
@@ -815,7 +1211,8 @@ function renderEspeciais(){
       ${esp.campeao?`<div style="font-size:13px;color:var(--green);margin-top:4px">✅ Campeão: <strong>${flag(esp.campeao)} ${esp.campeao}</strong>${camOk&&!isAdmin?" · +5pts 🎉":""}</div>`:""}
     </div>
     ${!isAdmin?`<div class="flex-end"><button class="btn btn-sm btn-green" id="btn-save-esp">💾 Salvar Especiais</button></div>`:""}
-    ${isAdmin?`<div class="alert info" style="margin-top:12px">Registre os resultados em ⚙️ Admin.</div>`:""}`;
+    ${isAdmin&&detailPlayer?`<div class="flex-end"><button class="btn btn-sm btn-green" id="btn-save-esp-player">💾 Salvar palpite de ${detailPlayer}</button></div>`:""}
+    ${isAdmin&&!detailPlayer?`<div class="alert info" style="margin-top:12px">Selecione um jogador acima para editar os palpites especiais.</div>`:""}`;
 }
 
 function renderResultados(){
@@ -880,6 +1277,13 @@ function renderRegras(){
         <li>Vencedor: <span class="pts-pill">2 pts</span> · Saldo: <span class="pts-pill">+2 pts</span> · Exato: <span class="pts-pill">10 pts</span></li>
       </ul>
     </div>
+    <div class="rule-block" style="border-color:var(--gold)"><h4>🥅 Jogo que vai para os pênaltis</h4>
+      <p>Na fase eliminatória, se o jogo for decidido nos <strong>pênaltis</strong>, vale como <strong>empate</strong> (o placar do tempo normal/prorrogação, ex.: 1×1). Quem foi para os pênaltis não muda o resultado para fins de palpite.</p>
+      <ul style="margin-top:6px">
+        <li>Cravar o placar do empate: <span class="pts-pill">5 pts</span> (×2 = 10 pts)</li>
+        <li>Acertar que foi empate, mas com outro placar: <span class="pts-pill">2 pts</span> (×2 = 4 pts)</li>
+      </ul>
+    </div>
     <div class="rule-block" style="border-color:var(--blue)"><h4>⭐ Palpites Especiais — +5 pts cada</h4>
       <ul><li><strong>Artilheiro da Copa</strong></li><li><strong>Seleção Campeã</strong></li></ul>
     </div>
@@ -894,7 +1298,7 @@ function renderRegras(){
       <ol>
         <li>Maior número de <strong>acertos</strong> (jogos com pelo menos 1pt)</li>
         <li>Maior número de <strong>placares exatos</strong></li>
-        <li>Quem acertou o palpite sobre a <strong>convocação do Neymar</strong> para a Copa 2026</li>
+        <li>Persistindo o empate, <strong>sorteio</strong> entre os empatados</li>
       </ol>
     </div>
     <div class="rule-block"><h4>👁️ Privacidade e Segurança</h4>
@@ -1247,7 +1651,42 @@ function bindAll(){
   };
   document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{currentTab=t.dataset.tab;render();});
   document.querySelectorAll(".phase-tab").forEach(t=>t.onclick=()=>{currentPhase=t.dataset.phase;render();});
-  document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>{palpiteView=b.dataset.view;localStorage.setItem("bolao26_view",palpiteView);render();});
+  document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>{
+    if(b.dataset.view){palpiteView=b.dataset.view;localStorage.setItem("bolao26_view",palpiteView);}
+    if(b.dataset.filter){matchFilter=b.dataset.filter;localStorage.setItem("bolao26_filter",matchFilter);}
+    render();
+  });
+
+  // ─── Gráfico de evolução (aba Evolução) ───
+  if(currentTab==="evolucao"){
+    setupEvolutionChart();
+  }
+
+  // ─── Palpites Encerrados: filtros, busca, navegação, seleção de jogo ───
+  if(currentTab==="palpitesencerrados"){
+    const fg=document.getElementById("pe-filter-group");
+    if(fg)fg.onchange=()=>{peFilterGroup=fg.value;render();};
+    const fd=document.getElementById("pe-filter-date");
+    if(fd)fd.onchange=()=>{peFilterDate=fd.value;render();};
+    const st=document.getElementById("pe-search-team");
+    if(st)st.oninput=()=>{peSearchTeam=st.value;render();};
+    document.querySelectorAll(".pe-list-item").forEach(el=>{
+      el.onclick=()=>{peSelectedId=el.dataset.rid;render();};
+    });
+    const prevBtn=document.getElementById("pe-prev");
+    if(prevBtn)prevBtn.onclick=()=>{
+      const all=getClosedMatchesList();
+      const idx=all.findIndex(m=>m.rid===peSelectedId);
+      if(all[idx+1]){peSelectedId=all[idx+1].rid;render();}
+    };
+    const nextBtn=document.getElementById("pe-next");
+    if(nextBtn)nextBtn.onclick=()=>{
+      const all=getClosedMatchesList();
+      const idx=all.findIndex(m=>m.rid===peSelectedId);
+      if(idx>0){peSelectedId=all[idx-1].rid;render();}
+    };
+  }
+
   const dps=document.getElementById("sel-detail-player");if(dps)dps.onchange=()=>{detailPlayer=dps.value||null;render();};
   const dpse=document.getElementById("sel-detail-player-esp");if(dpse)dpse.onchange=()=>{detailPlayer=dpse.value||null;render();};
 
@@ -1257,8 +1696,9 @@ function bindAll(){
       if(isAdmin)return;
       const mid=String(inp.dataset.mid),side=inp.dataset.side;
       if(!inputBuffer[mid]){
-        // Inicializa buffer com valores já salvos para que edição de 1 campo funcione
-        const pl=currentUser?fbState.players[currentUser]:null;
+        // Inicializa buffer com valores já salvos (usa jogador selecionado se admin)
+        const targetPl=isAdmin?detailPlayer:currentUser;
+        const pl=targetPl?fbState.players[targetPl]:null;
         const saved=pl?.palpites?.[mid];
         inputBuffer[mid]={h:saved?.h??'',a:saved?.a??''};
       }
@@ -1287,7 +1727,8 @@ function bindAll(){
       if(isAdmin)return;
       const eid=inp.dataset.eid,side=inp.dataset.side;
       if(!inputBuffer[eid]){
-        const pl=currentUser?fbState.players[currentUser]:null;
+        const targetPl=isAdmin?detailPlayer:currentUser;
+        const pl=targetPl?fbState.players[targetPl]:null;
         const saved=pl?.elimPalpites?.[eid];
         inputBuffer[eid]={h:saved?.h??'',a:saved?.a??''};
       }
@@ -1336,6 +1777,55 @@ function bindAll(){
     const cam=document.getElementById("esp-campeao")?.value||"";
     await update(ref(db),{[`bolao/players/${currentUser}/especiais/artilheiro`]:art,[`bolao/players/${currentUser}/especiais/campeao`]:cam});
     showAlert(null,"success","✅ Palpites especiais salvos!");render();
+  };
+
+  // Admin salvando palpites de grupo/elim de um jogador específico
+  const btnAdminSave=document.getElementById("btn-admin-save-palpites");
+  if(btnAdminSave)btnAdminSave.onclick=async()=>{
+    if(!detailPlayer){showAlert(null,"error","Selecione um jogador");return;}
+    const updates={};
+    // Salva todos os inputs de palpite visíveis na tela
+    document.querySelectorAll("input[data-mid]").forEach(inp=>{
+      const mid=inp.dataset.mid,side=inp.dataset.side;
+      if(!updates[`bolao/players/${detailPlayer}/palpites/${mid}`])
+        updates[`bolao/players/${detailPlayer}/palpites/${mid}`]={};
+      // Lê valor atual do input
+      const val=inp.value;
+      if(val!=="")updates[`bolao/players/${detailPlayer}/palpites/${mid}/${side}`]=val;
+    });
+    document.querySelectorAll("input[data-eid]").forEach(inp=>{
+      if(inp.dataset.elimSide)return;
+      const eid=inp.dataset.eid,side=inp.dataset.side;
+      if(inp.value!=="")updates[`bolao/players/${detailPlayer}/elimPalpites/${eid}/${side}`]=inp.value;
+    });
+    // Usa update flat para não sobrescrever campos não editados
+    const flatUpdates={};
+    document.querySelectorAll("input[data-mid]").forEach(inp=>{
+      if(inp.value!=="")flatUpdates[`bolao/players/${detailPlayer}/palpites/${inp.dataset.mid}/${inp.dataset.side}`]=inp.value;
+    });
+    document.querySelectorAll("input[data-eid]").forEach(inp=>{
+      if(inp.dataset.elimSide)return;
+      if(inp.value!=="")flatUpdates[`bolao/players/${detailPlayer}/elimPalpites/${inp.dataset.eid}/${inp.dataset.side}`]=inp.value;
+    });
+    if(Object.keys(flatUpdates).length){
+      await update(ref(db),flatUpdates);
+      showAlert(null,"success",`✅ Palpites de ${detailPlayer} salvos!`);
+    } else {
+      showAlert(null,"warn","Nenhum palpite para salvar");
+    }
+  };
+
+  // Admin salvando palpite especial de um jogador específico
+  const bsePlayer=document.getElementById("btn-save-esp-player");
+  if(bsePlayer)bsePlayer.onclick=async()=>{
+    if(!detailPlayer){showAlert(null,"error","Selecione um jogador");return;}
+    const art=document.getElementById("esp-artilheiro")?.value.trim()||"";
+    const cam=document.getElementById("esp-campeao")?.value||"";
+    await update(ref(db),{
+      [`bolao/players/${detailPlayer}/especiais/artilheiro`]:art,
+      [`bolao/players/${detailPlayer}/especiais/campeao`]:cam
+    });
+    showAlert(null,"success",`✅ Palpites especiais de ${detailPlayer} salvos!`);render();
   };
 
   // admin: config
@@ -1395,4 +1885,3 @@ function showAlert(id,type,msg){
 </script>
 </body>
 </html>
-
