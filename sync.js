@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const fetch = require('node-fetch');
+// Usa o fetch NATIVO do Node (>=18) — node-fetch@2 causava "Premature close" no Node novo.
 
 // Lê a credencial direto do segredo do GitHub (sem criar arquivo) e
 // descobre a URL do banco automaticamente a partir do projeto.
@@ -89,14 +89,31 @@ const PHASE_MAP = {
   "SEMI_FINALS":"Semi","THIRD_PLACE":"Final","FINAL":"Final"
 };
 
+// Busca JSON com até 3 tentativas (a API grátis às vezes derruba a conexão).
+async function fetchJsonRetry(url, tries = 3) {
+  for (let i = 1; i <= tries; i++) {
+    try {
+      const resp = await fetch(url, { headers: { 'X-Auth-Token': API_KEY } });
+      if (!resp.ok) {
+        console.log(`  API status ${resp.status} (tentativa ${i}/${tries})`);
+        if (i < tries) { await new Promise(r => setTimeout(r, 3000)); continue; }
+        return null;
+      }
+      return await resp.json();
+    } catch (e) {
+      console.log(`  Falha de rede (tentativa ${i}/${tries}): ${e.message}`);
+      if (i < tries) await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+  console.log('  ⚠️ Não consegui buscar após várias tentativas.');
+  return null;
+}
+
 async function syncResults() {
   console.log('⚽ Sincronizando resultados...');
   try {
-    const resp = await fetch(`${FD_BASE}/competitions/${WC2026_ID}/matches?status=FINISHED`, {
-      headers: { 'X-Auth-Token': API_KEY }
-    });
-    if (!resp.ok) { console.log(`API error: ${resp.status}`); return; }
-    const data = await resp.json();
+    const data = await fetchJsonRetry(`${FD_BASE}/competitions/${WC2026_ID}/matches?status=FINISHED`);
+    if (!data) return;
     const matches = data.matches || [];
     console.log(`  API retornou ${matches.length} jogos finalizados`);
     const updates = {};
@@ -132,12 +149,8 @@ async function syncResults() {
 async function syncElim() {
   console.log('🏟️ Sincronizando eliminatórias...');
   try {
-    const resp = await fetch(
-      `${FD_BASE}/competitions/${WC2026_ID}/matches?stage=LAST_16,QUARTER_FINALS,SEMI_FINALS,THIRD_PLACE,FINAL`,
-      { headers: { 'X-Auth-Token': API_KEY } }
-    );
-    if (!resp.ok) return;
-    const data = await resp.json();
+    const data = await fetchJsonRetry(`${FD_BASE}/competitions/${WC2026_ID}/matches?stage=LAST_16,QUARTER_FINALS,SEMI_FINALS,THIRD_PLACE,FINAL`);
+    if (!data) return;
     const snap = await db.ref('bolao/elimMatches').once('value');
     const existing = Object.values(snap.val() || {});
     const updates = {}, resultUpdates = {};
@@ -178,3 +191,4 @@ async function main() {
   process.exit(0);
 }
 main();
+
