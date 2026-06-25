@@ -40,7 +40,7 @@ const TEAM_MAP = {
   "Iraq":"Iraque","Norway":"Noruega","Argentina":"Argentina","Algeria":"Argélia",
   "Austria":"Áustria","Jordan":"Jordânia","Ghana":"Gana","Panama":"Panamá",
   "England":"Inglaterra","Croatia":"Croácia","Portugal":"Portugal",
-  "DR Congo":"R. D. Congo","Democratic Republic of Congo":"R. D. Congo",
+  "DR Congo":"R. D. Congo","Democratic Republic of Congo":"R. D. Congo","Democratic Republic of the Congo":"R. D. Congo","Congo DR":"R. D. Congo","RD Congo":"R. D. Congo","Congo":"R. D. Congo",
   "Uzbekistan":"Uzbequistão","Colombia":"Colômbia"
 };
 function toPort(name) { return TEAM_MAP[name] || name; }
