@@ -85,6 +85,7 @@ const GROUP_MATCHES = [
 ];
 
 const PHASE_MAP = {
+  "LAST_32":"R32","ROUND_OF_32":"R32",
   "LAST_16":"Oitavas","QUARTER_FINALS":"Quartas",
   "SEMI_FINALS":"Semi","THIRD_PLACE":"Final","FINAL":"Final"
 };
@@ -149,7 +150,7 @@ async function syncResults() {
 async function syncElim() {
   console.log('🏟️ Sincronizando eliminatórias...');
   try {
-    const data = await fetchJsonRetry(`${FD_BASE}/competitions/${WC2026_ID}/matches?stage=LAST_16,QUARTER_FINALS,SEMI_FINALS,THIRD_PLACE,FINAL`);
+    const data = await fetchJsonRetry(`${FD_BASE}/competitions/${WC2026_ID}/matches?stage=LAST_32,LAST_16,QUARTER_FINALS,SEMI_FINALS,THIRD_PLACE,FINAL`);
     if (!data) return;
     const snap = await db.ref('bolao/elimMatches').once('value');
     const existing = Object.values(snap.val() || {});
@@ -191,4 +192,3 @@ async function main() {
   process.exit(0);
 }
 main();
-
