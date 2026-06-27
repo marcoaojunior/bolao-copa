@@ -189,7 +189,13 @@ function fmtLockBRT(mt){
 }
 
 const FLAGS={"México":"🇲🇽","África do Sul":"🇿🇦","Coreia do Sul":"🇰🇷","República Tcheca":"🇨🇿","Canadá":"🇨🇦","Bósnia e Herzegovina":"🇧🇦","Catar":"🇶🇦","Suíça":"🇨🇭","Brasil":"🇧🇷","Marrocos":"🇲🇦","Haiti":"🇭🇹","Escócia":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Estados Unidos":"🇺🇸","Paraguai":"🇵🇾","Austrália":"🇦🇺","Turquia":"🇹🇷","Alemanha":"🇩🇪","Curaçao":"🇨🇼","Costa do Marfim":"🇨🇮","Equador":"🇪🇨","Holanda":"🇳🇱","Japão":"🇯🇵","Suécia":"🇸🇪","Tunísia":"🇹🇳","Bélgica":"🇧🇪","Egito":"🇪🇬","Irã":"🇮🇷","Nova Zelândia":"🇳🇿","Espanha":"🇪🇸","Cabo Verde":"🇨🇻","Arábia Saudita":"🇸🇦","Uruguai":"🇺🇾","França":"🇫🇷","Senegal":"🇸🇳","Iraque":"🇮🇶","Noruega":"🇳🇴","Argentina":"🇦🇷","Argélia":"🇩🇿","Áustria":"🇦🇹","Jordânia":"🇯🇴","Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croácia":"🇭🇷","Gana":"🇬🇭","Panamá":"🇵🇦","Portugal":"🇵🇹","R. D. Congo":"🇨🇩","Uzbequistão":"🇺🇿","Colômbia":"🇨🇴"};
-function flag(t){return FLAGS[t]||"🏳️"}
+// Códigos ISO para imagens de bandeira (flagcdn.com) — renderizam em qualquer SO, inclusive Windows.
+const FLAG_CODES={"México":"mx","África do Sul":"za","Coreia do Sul":"kr","República Tcheca":"cz","Canadá":"ca","Bósnia e Herzegovina":"ba","Catar":"qa","Suíça":"ch","Brasil":"br","Marrocos":"ma","Haiti":"ht","Escócia":"gb-sct","Estados Unidos":"us","Paraguai":"py","Austrália":"au","Turquia":"tr","Alemanha":"de","Curaçao":"cw","Costa do Marfim":"ci","Equador":"ec","Holanda":"nl","Japão":"jp","Suécia":"se","Tunísia":"tn","Bélgica":"be","Egito":"eg","Irã":"ir","Nova Zelândia":"nz","Espanha":"es","Cabo Verde":"cv","Arábia Saudita":"sa","Uruguai":"uy","França":"fr","Senegal":"sn","Iraque":"iq","Noruega":"no","Argentina":"ar","Argélia":"dz","Áustria":"at","Jordânia":"jo","Inglaterra":"gb-eng","Croácia":"hr","Gana":"gh","Panamá":"pa","Portugal":"pt","R. D. Congo":"cd","Uzbequistão":"uz","Colômbia":"co"};
+function flag(t){
+  const c=FLAG_CODES[t];
+  if(!c)return FLAGS[t]||"🏳️";
+  return `<img src="https://flagcdn.com/${c}.svg" alt="" loading="lazy" style="height:0.9em;width:auto;vertical-align:-1px;border-radius:2px;box-shadow:0 0 0 0.5px rgba(0,0,0,.15);display:inline-block">`;
+}
 
 const GROUPS={
   A:{teams:["México","África do Sul","Coreia do Sul","República Tcheca"],matches:[
@@ -1216,7 +1222,7 @@ function renderEspeciais(){
       <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Quem vai levantar a taça em Nova York no dia 19/07?</p>
       <select id="esp-campeao" ${(!isAdmin&&esp.campeao)||espDeadlinePassed?'disabled style="opacity:.6"':""}>
         <option value="">-- Selecione a seleção --</option>
-        ${ALL_TEAMS.map(t=>`<option value="${t}" ${(isAdmin?vEsp.campeao:pEsp.campeao)===t?"selected":""}>${flag(t)} ${t}</option>`).join("")}
+        ${ALL_TEAMS.map(t=>`<option value="${t}" ${(isAdmin?vEsp.campeao:pEsp.campeao)===t?"selected":""}>${FLAGS[t]||""} ${t}</option>`).join("")}
       </select>
       ${esp.campeao?`<div style="font-size:13px;color:var(--green);margin-top:4px">✅ Campeão: <strong>${flag(esp.campeao)} ${esp.campeao}</strong>${camOk&&!isAdmin?" · +5pts 🎉":""}</div>`:""}
     </div>
@@ -1354,7 +1360,7 @@ function renderAdmin(){
     <label style="color:var(--muted);font-size:12px">Seleção campeã</label>
     <select id="adm-campeao" style="margin-top:4px">
       <option value="">-- Selecione --</option>
-      ${ALL_TEAMS.map(t=>`<option value="${t}" ${esp.campeao===t?"selected":""}>${flag(t)} ${t}</option>`).join("")}
+      ${ALL_TEAMS.map(t=>`<option value="${t}" ${esp.campeao===t?"selected":""}>${FLAGS[t]||""} ${t}</option>`).join("")}
     </select>
     <div class="flex-end"><button class="btn btn-sm btn-green" id="btn-save-esp-admin">Salvar Especiais</button></div>
   </div>
@@ -1895,4 +1901,3 @@ function showAlert(id,type,msg){
 </script>
 </body>
 </html>
-
