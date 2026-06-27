@@ -289,7 +289,7 @@ const GROUPS={
     {id:68,home:"Croácia",away:"Gana",date:"27/06",time:"18h",city:"Philadelphia"}
   ]}
 };
-const ELIM_PHASES=[{phase:"Oitavas",label:"Dezesseis-avos de Final"},{phase:"Quartas",label:"Quartas de Final"},{phase:"Semi",label:"Semifinais"},{phase:"Final",label:"Final + 3º Lugar"}];
+const ELIM_PHASES=[{phase:"R32",label:"Dezesseis-avos de Final"},{phase:"Oitavas",label:"Oitavas de Final"},{phase:"Quartas",label:"Quartas de Final"},{phase:"Semi",label:"Semifinais"},{phase:"Final",label:"Final + 3º Lugar"}];
 const GROUP_MATCHES=[];
 for(const g in GROUPS)GROUPS[g].matches.forEach(m=>GROUP_MATCHES.push({...m,group:g,phase:"Grupos"}));
 const ALL_TEAMS=Object.values(GROUPS).flatMap(g=>g.teams).sort();
@@ -554,11 +554,21 @@ async function autoSavePalpite(key,isElim){
 }
 
 // ─── RENDER ───
+// Aviso de destaque no topo — anuncia a fase aberta para palpites.
+// Troca sozinho para "mata-mata aberto" quando os confrontos eliminatórios chegarem.
+function renderAnnounce(){
+  const temMataMata=fbState.elimMatches&&fbState.elimMatches.length>0;
+  if(temMataMata){
+    return `<div class="alert success" style="font-weight:600;text-align:center">🏆 Mata-mata aberto! Os confrontos eliminatórios já estão no ar — faça seus palpites (valem ×2).</div>`;
+  }
+  return `<div class="alert success" style="font-weight:600;text-align:center">📢 Fase de grupos aberta para palpites! O bolão vale a partir da 2ª rodada — bora cravar os placares! ⚽</div>`;
+}
+
 function render(){
   const root=document.getElementById("root");
   if(!currentUser&&!isAdmin){root.innerHTML=renderLogin();bindLogin();return;}
   root.innerHTML=`
-    ${renderTopBar()}${renderTabs()}
+    ${renderTopBar()}${renderTabs()}${renderAnnounce()}
     <div class="section ${currentTab==="ranking"?"active":""}">${renderRanking()}</div>
     <div class="section ${currentTab==="evolucao"?"active":""}">${renderEvolucao()}</div>
     <div class="section ${currentTab==="palpites"?"active":""}">${renderPalpites()}</div>
@@ -1467,10 +1477,10 @@ async function apiImportResults(showStatus=true){
 
 async function apiImportElim(showStatus=true){
   try{
-    const resp=await fetch(`${FD_BASE}/competitions/${WC2026_ID}/matches?stage=LAST_16,QUARTER_FINALS,SEMI_FINALS,THIRD_PLACE,FINAL`,{headers:{"X-Auth-Token":API_KEY}});
+    const resp=await fetch(`${FD_BASE}/competitions/${WC2026_ID}/matches?stage=LAST_32,LAST_16,QUARTER_FINALS,SEMI_FINALS,THIRD_PLACE,FINAL`,{headers:{"X-Auth-Token":API_KEY}});
     if(!resp.ok)return;
     const data=await resp.json();
-    const phaseMap={"LAST_16":"Oitavas","QUARTER_FINALS":"Quartas","SEMI_FINALS":"Semi","THIRD_PLACE":"Final","FINAL":"Final"};
+    const phaseMap={"LAST_32":"R32","ROUND_OF_32":"R32","LAST_16":"Oitavas","QUARTER_FINALS":"Quartas","SEMI_FINALS":"Semi","THIRD_PLACE":"Final","FINAL":"Final"};
     const elimUpdates={};
     (data.matches||[]).forEach(match=>{
       if(!match.homeTeam?.name||match.homeTeam.name==="TBD"||match.homeTeam.name==="Yet to be defined")return;
@@ -1885,3 +1895,4 @@ function showAlert(id,type,msg){
 </script>
 </body>
 </html>
+
