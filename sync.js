@@ -177,7 +177,7 @@ async function syncElim() {
       // (no v4 o fullTime já inclui os pênaltis), e o placar dos pênaltis fica guardado à parte.
       const sc = match.score || {};
       const ft = sc.fullTime || {};
-      if (ft.home !== null && ft.home !== undefined && exists) {
+      if (match.status === 'FINISHED' && ft.home !== null && ft.home !== undefined && exists) {
         const pen = sc.penalties;
         const wentToPens = sc.duration === 'PENALTY_SHOOTOUT' || (pen && pen.home !== null && pen.home !== undefined);
         let rH, rA, penStr = '';
