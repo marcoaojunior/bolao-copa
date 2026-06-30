@@ -141,6 +141,9 @@ const auth=getAuth(fbApp);
 
 // Autenticação anônima — garante conexão estável com Firebase
 signInAnonymously(auth).catch(e=>console.error("Auth error:",e));
+// Só anexa o listener do banco DEPOIS do login anônimo (necessário com regras protegidas)
+let _mainAttached=false;
+onAuthStateChanged(auth,(user)=>{ if(user&&!_mainAttached){_mainAttached=true; attachMainListener();} });
 
 // ─── HASH DE SENHA ───
 async function hashPassword(password){
@@ -323,6 +326,7 @@ function clearSession(){
 
 // Listener principal — configurações, resultados, fases eliminatórias
 let renderTimer=null;
+function attachMainListener(){
 onValue(ref(db,"bolao"),(snap)=>{
   const d=snap.val();
   if(d){
@@ -344,6 +348,7 @@ onValue(ref(db,"bolao"),(snap)=>{
     }
   },100);
 });
+}
 
 
 
@@ -997,7 +1002,7 @@ function renderPalpitesEncerrados(){
           <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--blue)">${flag(current.home)} ${current.home} × ${current.away} ${flag(current.away)}</div>
           <div style="font-size:11px;color:var(--muted)">${current.isElim?current.phase:'Grupo '+current.group} · ${current.time||"?"} BRT · ${current.date}${current.isElim?' · ×'+mult+' pts':''}</div>
         </div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${res?.h!==undefined?"var(--green)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}`:"Aguardando resultado"}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${res?.h!==undefined?"var(--green)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}${res.pen?` (pên. ${res.pen})`:""}`:"Aguardando resultado"}</div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
@@ -1101,7 +1106,7 @@ function renderPalpites(){
           </div>
           <div class="match-date-label">Grupo ${m.group} · ${m.time} BRT · ${m.date} · ${m.city}</div>
           <div style="margin-top:3px">${lockBadge(mt,hasResult)}</div>
-          ${hasResult?`<div style="font-size:10px;color:var(--green);margin-top:2px">Resultado: ${res.h}×${res.a}</div>`:""}
+          ${hasResult?`<div style="font-size:10px;color:var(--green);margin-top:2px">Resultado: ${res.h}×${res.a}${res.pen?` (pên. ${res.pen})`:""}</div>`:""}
           ${!isAdmin&&!locked?`<div id="status_${key}" class="save-status">${savedPal?.h!==undefined?"✅ Palpite salvo":""}</div>`:""}
         </div>
         <div class="match-team right">${m.away} ${flag(m.away)}</div>
@@ -1148,7 +1153,7 @@ function renderPalpites(){
     const adminSaveBtn=isAdmin&&detailPlayer?`<div class="flex-end" style="margin-top:12px"><button class="btn btn-sm btn-green" id="btn-admin-save-palpites">💾 Salvar palpites de ${detailPlayer}</button></div>`:"";
     return phTabs+viewToggle+warnBanner+autoSaveInfo+playerSel+html+adminSaveBtn;
   } else {
-    const elimMs=fbState.elimMatches.filter(m=>m.phase===currentPhase);
+    const elimMs=fbState.elimMatches.filter(m=>m.phase===currentPhase).sort((a,b)=>{const ta=a.date?matchTime(a.date,a.time).getTime():9e15;const tb=b.date?matchTime(b.date,b.time).getTime():9e15;return ta-tb;});
     if(!elimMs.length)return phTabs+playerSel+`<div class="empty"><div class="icon">⏳</div><p>Confrontos desta fase ainda não definidos. Serão importados automaticamente da API assim que a FIFA anunciar os jogos.</p></div>`;
     let html="";
     elimMs.forEach(m=>{
@@ -1175,7 +1180,7 @@ function renderPalpites(){
           </div>
           <div class="match-date-label">${m.time||"?"} BRT · ${m.date||"A definir"} · ×2 pts</div>
           <div style="margin-top:3px">${mt?lockBadge(mt,hasResult):`<span class="lock-badge lock-open">🟢 Aberto</span>`}</div>
-          ${hasResult?`<div style="font-size:10px;color:var(--green);margin-top:2px">Resultado: ${res.h}×${res.a}</div>`:""}
+          ${hasResult?`<div style="font-size:10px;color:var(--green);margin-top:2px">Resultado: ${res.h}×${res.a}${res.pen?` (pên. ${res.pen})`:""}</div>`:""}
           ${!isAdmin&&!locked_elim?`<div id="status_${eid}" class="save-status">${savedPal?.h!==undefined?"✅ Palpite salvo":""}</div>`:""}
         </div>
         <div class="match-team right">${m.away} ${flag(m.away)}</div>
@@ -1242,7 +1247,7 @@ function renderResultados(){
         html+=`<div class="result-row">
           <div style="font-weight:500;font-size:13px">${flag(m.home)} ${m.home}</div>
           <div style="text-align:center">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${res?.h!==undefined?"var(--blue)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}`:"vs"}</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${res?.h!==undefined?"var(--blue)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}${res.pen?` (pên. ${res.pen})`:""}`:"vs"}</div>
             <div style="font-size:10px;color:var(--muted)">${m.time} BRT · ${m.date} · ${m.city}</div>
           </div>
           <div style="font-weight:500;font-size:13px;text-align:right">${m.away} ${flag(m.away)}</div>
@@ -1250,7 +1255,7 @@ function renderResultados(){
       });html+="</div>";
     });return phTabs+html;
   } else {
-    const elimMs=fbState.elimMatches.filter(m=>m.phase===currentPhase);
+    const elimMs=fbState.elimMatches.filter(m=>m.phase===currentPhase).sort((a,b)=>{const ta=a.date?matchTime(a.date,a.time).getTime():9e15;const tb=b.date?matchTime(b.date,b.time).getTime():9e15;return ta-tb;});
     if(!elimMs.length)return phTabs+`<div class="empty"><div class="icon">⏳</div><p>Nenhum jogo desta fase ainda</p></div>`;
     let html="";
     elimMs.forEach(m=>{
@@ -1258,7 +1263,7 @@ function renderResultados(){
       html+=`<div class="result-row">
         <div style="font-weight:500;font-size:13px">${flag(m.home)} ${m.home}</div>
         <div style="text-align:center">
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${res?.h!==undefined?"var(--blue)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}`:"vs"}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${res?.h!==undefined?"var(--blue)":"var(--muted)"}">${res?.h!==undefined?`${res.h} × ${res.a}${res.pen?` (pên. ${res.pen})`:""}`:"vs"}</div>
           <div style="font-size:10px;color:var(--muted)">${m.time||"?"} BRT · ${m.date||"A definir"}</div>
         </div>
         <div style="font-weight:500;font-size:13px;text-align:right">${m.away} ${flag(m.away)}</div>
@@ -1294,7 +1299,7 @@ function renderRegras(){
       </ul>
     </div>
     <div class="rule-block" style="border-color:var(--gold)"><h4>🥅 Jogo que vai para os pênaltis</h4>
-      <p>Na fase eliminatória, se o jogo for decidido nos <strong>pênaltis</strong>, vale como <strong>empate</strong> (o placar do tempo normal/prorrogação, ex.: 1×1). Quem foi para os pênaltis não muda o resultado para fins de palpite.</p>
+      <p>Na fase eliminatória, se o jogo for decidido nos <strong>pênaltis</strong>, vale como <strong>empate</strong> (o placar do tempo normal/prorrogação, ex.: 1×1). O placar dos pênaltis aparece <strong>entre parênteses</strong> só pra referência (ex.: 1×1 (pên. 4×3)) — ele <strong>não conta</strong> para a pontuação.</p>
       <ul style="margin-top:6px">
         <li>Cravar o placar do empate: <span class="pts-pill">5 pts</span> (×2 = 10 pts)</li>
         <li>Acertar que foi empate, mas com outro placar: <span class="pts-pill">2 pts</span> (×2 = 4 pts)</li>
