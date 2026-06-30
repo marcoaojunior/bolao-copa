@@ -156,7 +156,8 @@ async function syncElim() {
     const existing = Object.values(snap.val() || {});
     const updates = {}, resultUpdates = {};
     (data.matches || []).forEach(match => {
-      if (!match.homeTeam?.name || match.homeTeam.name === 'TBD' || match.homeTeam.name === 'Yet to be defined') return;
+      const _tbd = n => !n || n === 'TBD' || n === 'Yet to be defined';
+      if (_tbd(match.homeTeam?.name) || _tbd(match.awayTeam?.name)) return;
       const phase = PHASE_MAP[match.stage]; if (!phase) return;
       const homePT = toPort(match.homeTeam.name), awayPT = toPort(match.awayTeam?.name || '');
       const exists = existing.find(m => m.phase === phase && (m.home === homePT || m.away === awayPT));
@@ -172,11 +173,29 @@ async function syncElim() {
           date:`${dd}/${mm}`,time:`${hh}h${mn>0?mn.toString().padStart(2,'0'):''}`,city:match.venue||''};
         console.log(`  ✅ Novo: ${homePT} × ${awayPT} (${phase})`);
       }
-      const h = match.score?.fullTime?.home, a = match.score?.fullTime?.away;
-      if (h !== null && h !== undefined && exists) {
+      // Resultado — trata pênaltis: o que CONTA é o empate do tempo normal/prorrogação
+      // (no v4 o fullTime já inclui os pênaltis), e o placar dos pênaltis fica guardado à parte.
+      const sc = match.score || {};
+      const ft = sc.fullTime || {};
+      if (ft.home !== null && ft.home !== undefined && exists) {
+        const pen = sc.penalties;
+        const wentToPens = sc.duration === 'PENALTY_SHOOTOUT' || (pen && pen.home !== null && pen.home !== undefined);
+        let rH, rA, penStr = '';
+        if (wentToPens) {
+          const rt = sc.regularTime; // resultado após 90 min (empate)
+          if (rt && rt.home !== null && rt.home !== undefined) { rH = rt.home; rA = rt.away; }
+          else { rH = Math.min(ft.home, ft.away); rA = rH; }
+          if (rH !== rA) { rH = Math.min(rH, rA); rA = rH; } // garante empate
+          if (pen && pen.home !== null && pen.home !== undefined) penStr = `${pen.home}×${pen.away}`;
+        } else {
+          rH = ft.home; rA = ft.away;
+        }
         const inv = exists.home === awayPT;
-        resultUpdates[`bolao/results/e_${exists.id}/h`] = String(inv?a:h);
-        resultUpdates[`bolao/results/e_${exists.id}/a`] = String(inv?h:a);
+        resultUpdates[`bolao/results/e_${exists.id}/h`] = String(inv ? rA : rH);
+        resultUpdates[`bolao/results/e_${exists.id}/a`] = String(inv ? rH : rA);
+        resultUpdates[`bolao/results/e_${exists.id}/pen`] = penStr
+          ? (inv ? penStr.split('×').reverse().join('×') : penStr)
+          : null;
       }
     });
     if (Object.keys(updates).length > 0) await db.ref('/').update(updates);
